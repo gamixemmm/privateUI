@@ -450,7 +450,7 @@ function Library:CreateWindow(Settings)
         Position = UDim2.new(0.5, 0, 0.4, 0),
         AnchorPoint = Vector2.new(0.5, 0.5),
         Size = UDim2.new(0, 350, 0, 350),
-        Image = Logo or "rbxassetid://136163314754809",
+        Image = Logo or "rbxassetid://70896085439639",
         ZIndex = 1001,
         ScaleType = Enum.ScaleType.Fit
     })
@@ -536,7 +536,7 @@ function Library:CreateWindow(Settings)
         Name = "CustomCursor",
         BackgroundTransparency = 1,
         Size = UDim2.new(0, 20, 0, 20),
-        Image = "rbxassetid://102366537072878",
+        Image = "rbxassetid://70896085439639",
         ImageColor3 = Library.Theme.Text,
         ZIndex = 9999,
         Visible = true
@@ -885,15 +885,28 @@ function Library:CreateWindow(Settings)
             Parent = TabPage,
             BackgroundTransparency = 1,
             Size = UDim2.new(1,0,1,0),
-            ScrollBarThickness = 3,
-            ScrollBarImageColor3 = Library.Theme.Outline,
+            ScrollBarThickness = 4,
+            ScrollBarImageColor3 = Library.AccentColor,
             CanvasSize = UDim2.new(0,0,0,0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollingDirection = Enum.ScrollingDirection.Y,
             BorderSizePixel = 0
         })
-        local Left = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 1, 0)})
-        local Right = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 1, 0), Position = UDim2.new(0.5, 8, 0, 0)})
+        local Left = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+        local Right = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), Position = UDim2.new(0.5, 8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
         Create("UIListLayout", {Parent = Left, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
         Create("UIListLayout", {Parent = Right, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
+        
+        -- Update canvas size based on content
+        local function UpdateCanvasSize()
+            local leftHeight = Left.AbsoluteSize.Y
+            local rightHeight = Right.AbsoluteSize.Y
+            local maxHeight = math.max(leftHeight, rightHeight)
+            DefaultContainer.CanvasSize = UDim2.new(0, 0, 0, maxHeight + 20)
+        end
+        Left:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
+        Right:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
+        task.defer(UpdateCanvasSize)
         
         local function Activate()
             for _, v in pairs(TabContainer:GetChildren()) do
@@ -957,15 +970,27 @@ function Library:CreateWindow(Settings)
                 BackgroundTransparency = 1,
                 Position = UDim2.new(0, 0, 0, 40),
                 Size = UDim2.new(1, 0, 1, -40),
-                ScrollBarThickness = 3,
-                ScrollBarImageColor3 = Library.Theme.Outline,
+                ScrollBarThickness = 4,
+                ScrollBarImageColor3 = Library.AccentColor,
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                ScrollingDirection = Enum.ScrollingDirection.Y,
                 Visible = false,
                 BorderSizePixel = 0
             })
-            local SLeft = Create("Frame", {Parent = SubContent, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 1, 0)})
-            local SRight = Create("Frame", {Parent = SubContent, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 1, 0), Position = UDim2.new(0.5, 8, 0, 0)})
+            local SLeft = Create("Frame", {Parent = SubContent, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+            local SRight = Create("Frame", {Parent = SubContent, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), Position = UDim2.new(0.5, 8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
             Create("UIListLayout", {Parent = SLeft, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
             Create("UIListLayout", {Parent = SRight, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
+            
+            -- Update subtab canvas size
+            local function UpdateSubCanvasSize()
+                local leftH = SLeft.AbsoluteSize.Y
+                local rightH = SRight.AbsoluteSize.Y
+                SubContent.CanvasSize = UDim2.new(0, 0, 0, math.max(leftH, rightH) + 20)
+            end
+            SLeft:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateSubCanvasSize)
+            SRight:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateSubCanvasSize)
+            task.defer(UpdateSubCanvasSize)
             
             SubBtn.MouseEnter:Connect(function() if Indicator.BackgroundTransparency == 1 then TweenService:Create(SubBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.Text}):Play() end end)
             SubBtn.MouseLeave:Connect(function() if Indicator.BackgroundTransparency == 1 then TweenService:Create(SubBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.TextDim}):Play() end end)
@@ -1000,13 +1025,12 @@ function Library:CreateWindow(Settings)
         end
         
         function Tab:CreateGroupbox(Parent, Name)
-            local MaxHeight = 400
-            
             local Box = Create("Frame", {
                 Parent = Parent,
                 BackgroundColor3 = Library.Theme.Section,
                 Size = UDim2.new(1, 0, 0, 50),
-                ClipsDescendants = true,
+                AutomaticSize = Enum.AutomaticSize.Y,
+                ClipsDescendants = false,
                 BorderSizePixel = 0
             })
             Create("UICorner", {Parent = Box, CornerRadius = UDim.new(0, 8)})
@@ -1024,37 +1048,15 @@ function Library:CreateWindow(Settings)
             })
             Create("Frame", {Parent = Box, BackgroundColor3 = Library.Theme.Outline, Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0,0,0,32), BorderSizePixel = 0})
 
-            local ScrollFrame = Create("ScrollingFrame", {
+            local Container = Create("Frame", {
                 Parent = Box,
                 BackgroundTransparency = 1,
-                Position = UDim2.new(0, 0, 0, 40),
-                Size = UDim2.new(1, 0, 1, -52),
-                BorderSizePixel = 0,
-                ScrollBarThickness = 4,
-                ScrollBarImageColor3 = Library.AccentColor,
-                CanvasSize = UDim2.new(0, 0, 0, 0),
-                AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                ScrollingDirection = Enum.ScrollingDirection.Y
-            })
-            
-            local Container = Create("Frame", {
-                Parent = ScrollFrame,
-                BackgroundTransparency = 1,
-                Position = UDim2.new(0, 12, 0, 0),
+                Position = UDim2.new(0, 12, 0, 40),
                 Size = UDim2.new(1, -24, 0, 0),
                 AutomaticSize = Enum.AutomaticSize.Y
             })
             Create("UIListLayout", {Parent = Container, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8)})
             Create("UIPadding", {Parent = Container, PaddingBottom = UDim.new(0, 12)})
-            
-            local function UpdateBoxSize()
-                local contentHeight = Container.AbsoluteSize.Y + 52
-                local finalHeight = math.min(contentHeight, MaxHeight)
-                Box.Size = UDim2.new(1, 0, 0, finalHeight)
-            end
-            
-            Container:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateBoxSize)
-            task.defer(UpdateBoxSize)
 
             local Group = {}
             
@@ -1160,7 +1162,7 @@ function Library:CreateWindow(Settings)
             end
             
             function Group:AddDropdown(Text, Options, Default, Callback)
-                local DropFrame = Create("Frame", {Parent = Container, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,50), ClipsDescendants = false})
+                local DropFrame = Create("Frame", {Parent = Container, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,50), ClipsDescendants = false, ZIndex = 1})
                 local Label = Create("TextLabel", {Parent = DropFrame, Text = Text, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13})
                 
                 local Btn = Create("TextButton", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Element, Size = UDim2.new(1,0,0,28), Position = UDim2.new(0,0,0,20), Text = "", Font = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 13, AutoButtonColor = false, BorderSizePixel = 0})
@@ -1171,11 +1173,11 @@ function Library:CreateWindow(Settings)
                 
                 local Arrow = Create("ImageLabel", {Parent = Btn, Image = "rbxassetid://7072706796", ImageColor3 = Library.Theme.TextDim, Size = UDim2.new(0,16,0,16), Position = UDim2.new(1,-26,0.5,-8), BackgroundTransparency = 1, ScaleType = Enum.ScaleType.Fit})
                 
-                local ListFrame = Create("Frame", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Section, Position = UDim2.new(0,0,0,50), Size = UDim2.new(1,0,0,0), BorderSizePixel = 0, ZIndex = 50, ClipsDescendants = true})
+                local ListFrame = Create("Frame", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Section, Position = UDim2.new(0,0,0,50), Size = UDim2.new(1,0,0,0), BorderSizePixel = 0, ZIndex = 100, ClipsDescendants = true})
                 Create("UICorner", {Parent = ListFrame, CornerRadius = UDim.new(0,6)})
                 Create("UIStroke", {Parent = ListFrame, Color = Library.Theme.Outline, Thickness = 1})
                 
-                local List = Create("ScrollingFrame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0), Position = UDim2.new(0,0,0,0), BorderSizePixel = 0, ScrollBarThickness = 0, ScrollBarImageColor3 = Library.AccentColor, ZIndex = 51, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y})
+                local List = Create("ScrollingFrame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0), Position = UDim2.new(0,0,0,0), BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = Library.AccentColor, ZIndex = 101, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y})
                 Create("UIListLayout", {Parent = List, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0,0)})
                 
                 local Open = false
@@ -1186,8 +1188,8 @@ function Library:CreateWindow(Settings)
                 }
                 
                 local function CreateOption(opt)
-                    local OptBtn = Create("TextButton", {Parent = List, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,28), Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 52})
-                    local OptText = Create("TextLabel", {Parent = OptBtn, Text = opt, BackgroundTransparency = 1, Position = UDim2.new(0,10,0,0), Size = UDim2.new(1,-20,1,0), Font = Library.Font, TextColor3 = Library.Theme.TextDim, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 53})
+                    local OptBtn = Create("TextButton", {Parent = List, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,28), Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 102})
+                    local OptText = Create("TextLabel", {Parent = OptBtn, Text = opt, BackgroundTransparency = 1, Position = UDim2.new(0,10,0,0), Size = UDim2.new(1,-20,1,0), Font = Library.Font, TextColor3 = Library.Theme.TextDim, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 103})
                     
                     OptBtn.MouseEnter:Connect(function() 
                         TweenService:Create(OptBtn, TweenInfo.new(0.1), {BackgroundTransparency = 0, BackgroundColor3 = Library.AccentColor}):Play() 
@@ -1256,7 +1258,7 @@ function Library:CreateWindow(Settings)
             
             function Group:AddMultiDropdown(Text, Options, Defaults, Callback)
                 Defaults = Defaults or {}
-                local DropFrame = Create("Frame", {Parent = Container, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,50), ClipsDescendants = false})
+                local DropFrame = Create("Frame", {Parent = Container, BackgroundTransparency = 1, Size = UDim2.new(1,0,0,50), ClipsDescendants = false, ZIndex = 1})
                 local Label = Create("TextLabel", {Parent = DropFrame, Text = Text, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13})
                 
                 local Btn = Create("TextButton", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Element, Size = UDim2.new(1,0,0,28), Position = UDim2.new(0,0,0,20), Text = "", Font = Library.Font, TextColor3 = Library.Theme.Text, TextSize = 13, AutoButtonColor = false, BorderSizePixel = 0})
@@ -1267,11 +1269,11 @@ function Library:CreateWindow(Settings)
                 
                 local Arrow = Create("ImageLabel", {Parent = Btn, Image = "rbxassetid://7072706796", ImageColor3 = Library.Theme.TextDim, Size = UDim2.new(0,16,0,16), Position = UDim2.new(1,-26,0.5,-8), BackgroundTransparency = 1, ScaleType = Enum.ScaleType.Fit})
                 
-                local ListFrame = Create("Frame", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Section, Position = UDim2.new(0,0,0,50), Size = UDim2.new(1,0,0,0), BorderSizePixel = 0, ZIndex = 50, ClipsDescendants = true})
+                local ListFrame = Create("Frame", {Parent = DropFrame, BackgroundColor3 = Library.Theme.Section, Position = UDim2.new(0,0,0,50), Size = UDim2.new(1,0,0,0), BorderSizePixel = 0, ZIndex = 200, ClipsDescendants = true})
                 Create("UICorner", {Parent = ListFrame, CornerRadius = UDim.new(0,6)})
                 Create("UIStroke", {Parent = ListFrame, Color = Library.Theme.Outline, Thickness = 1})
                 
-                local List = Create("ScrollingFrame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0), Position = UDim2.new(0,0,0,0), BorderSizePixel = 0, ScrollBarThickness = 0, ScrollBarImageColor3 = Library.AccentColor, ZIndex = 51, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y})
+                local List = Create("ScrollingFrame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0), Position = UDim2.new(0,0,0,0), BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = Library.AccentColor, ZIndex = 201, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y})
                 Create("UIListLayout", {Parent = List, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0,0)})
                 
                 local Open = false
@@ -1316,8 +1318,8 @@ function Library:CreateWindow(Settings)
                 local OptionButtons = {}
                 
                 local function CreateOption(opt)
-                    local OptBtn = Create("TextButton", {Parent = List, BackgroundTransparency = Selected[opt] and 0 or 1, BackgroundColor3 = Library.AccentColor, Size = UDim2.new(1,0,0,28), Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 52})
-                    local OptText = Create("TextLabel", {Parent = OptBtn, Text = opt, BackgroundTransparency = 1, Position = UDim2.new(0,10,0,0), Size = UDim2.new(1,-20,1,0), Font = Library.Font, TextColor3 = Selected[opt] and Library.Theme.Text or Library.Theme.TextDim, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 53})
+                    local OptBtn = Create("TextButton", {Parent = List, BackgroundTransparency = Selected[opt] and 0 or 1, BackgroundColor3 = Library.AccentColor, Size = UDim2.new(1,0,0,28), Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 202})
+                    local OptText = Create("TextLabel", {Parent = OptBtn, Text = opt, BackgroundTransparency = 1, Position = UDim2.new(0,10,0,0), Size = UDim2.new(1,-20,1,0), Font = Library.Font, TextColor3 = Selected[opt] and Library.Theme.Text or Library.Theme.TextDim, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 203})
                     
                     OptionButtons[opt] = {Btn = OptBtn, Text = OptText}
                     
