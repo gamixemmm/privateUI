@@ -304,7 +304,7 @@ end
 local function MakeDraggable(trigger, object)
     local dragging, dragInput, dragStart, startPos
     trigger.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = object.Position
@@ -312,7 +312,7 @@ local function MakeDraggable(trigger, object)
         end
     end)
     trigger.InputChanged:Connect(function(input) 
-        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end 
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end 
     end)
     InputService.InputChanged:Connect(function(input) 
         if input == dragInput and dragging then
@@ -397,6 +397,33 @@ function Library:CreateWindow(Settings)
     local ScreenGui = Create("ScreenGui", { Name = "EvictedUI", IgnoreGuiInset = true, ResetOnSpawn = false })
     ProtectGui(ScreenGui)
     
+    -- Responsive sizing based on screen
+    local Camera = workspace.CurrentCamera
+    local ViewportSize = Camera.ViewportSize
+    local isMobile = InputService.TouchEnabled and not InputService.KeyboardEnabled
+    
+    -- Calculate responsive sizes
+    local function getResponsiveSize()
+        local vp = Camera.ViewportSize
+        local baseWidth = 750
+        local baseHeight = 550
+        
+        if isMobile then
+            -- Mobile: use most of the screen
+            local width = math.min(vp.X * 0.95, 750)
+            local height = math.min(vp.Y * 0.85, 550)
+            return width, height
+        else
+            -- Desktop: scale down if screen is small
+            local maxWidth = math.min(vp.X * 0.8, baseWidth)
+            local maxHeight = math.min(vp.Y * 0.85, baseHeight)
+            return maxWidth, maxHeight
+        end
+    end
+    
+    local windowWidth, windowHeight = getResponsiveSize()
+    local sidebarWidth = isMobile and math.min(150, windowWidth * 0.25) or 200
+    
     -- Branding watermark
     if BrandingText then
         local brandPos
@@ -431,12 +458,12 @@ function Library:CreateWindow(Settings)
         Library.BrandingLabel = BrandingLabel
     end
     
-    -- Loading Screen (same size as menu)
+    -- Loading Screen (responsive size)
     local LoadingScreen = Create("Frame", {
         Parent = ScreenGui,
         BackgroundColor3 = Library.Theme.Background,
-        Position = UDim2.new(0.5, -375, 0.5, -275),
-        Size = UDim2.new(0, 750, 0, 550),
+        Position = UDim2.new(0.5, -windowWidth/2, 0.5, -windowHeight/2),
+        Size = UDim2.new(0, windowWidth, 0, windowHeight),
         ZIndex = 1000,
         BorderSizePixel = 0
     })
@@ -449,7 +476,7 @@ function Library:CreateWindow(Settings)
         BackgroundTransparency = 1,
         Position = UDim2.new(0.5, 0, 0.4, 0),
         AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.new(0, 350, 0, 350),
+        Size = UDim2.new(0, math.min(350, windowWidth * 0.5), 0, math.min(350, windowHeight * 0.5)),
         Image = Logo or "rbxassetid://70896085439639",
         ZIndex = 1001,
         ScaleType = Enum.ScaleType.Fit
@@ -460,7 +487,7 @@ function Library:CreateWindow(Settings)
         BackgroundColor3 = Library.Theme.Element,
         Position = UDim2.new(0.5, 0, 0.7, 0),
         AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.new(0, 300, 0, 24),
+        Size = UDim2.new(0, math.min(300, windowWidth * 0.6), 0, 24),
         ZIndex = 1001,
         BorderSizePixel = 0
     })
@@ -492,11 +519,11 @@ function Library:CreateWindow(Settings)
         BackgroundTransparency = 1,
         Position = UDim2.new(0.5, 0, 0.78, 0),
         AnchorPoint = Vector2.new(0.5, 0),
-        Size = UDim2.new(0, 300, 0, 20),
+        Size = UDim2.new(0, math.min(300, windowWidth * 0.6), 0, 20),
         Text = "Loading...",
         Font = Library.Font,
         TextColor3 = Library.Theme.TextDim,
-        TextSize = 14,
+        TextSize = isMobile and 12 or 14,
         ZIndex = 1001
     })
     
@@ -521,70 +548,76 @@ function Library:CreateWindow(Settings)
     TweenService:Create(LoadingBar, TweenInfo.new(loadDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
     task.delay(loadDuration, ShowMainAfterLoad)
     
-    -- Notification Holder
+    -- Notification Holder (responsive position)
     NotificationHolder = Create("Frame", {
         Parent = ScreenGui,
         BackgroundTransparency = 1,
-        Position = UDim2.new(1, -310, 1, -310),
+        Position = isMobile and UDim2.new(0.5, -150, 1, -200) or UDim2.new(1, -310, 1, -310),
         Size = UDim2.new(0, 300, 0, 300)
     })
     Create("UIListLayout", {Parent = NotificationHolder, Padding = UDim.new(0, 5), VerticalAlignment = Enum.VerticalAlignment.Bottom})
 
-    -- Custom Cursor
-    local CustomCursor = Create("ImageLabel", {
-        Parent = ScreenGui,
-        Name = "CustomCursor",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0, 20, 0, 20),
-        Image = "rbxassetid://70896085439639",
-        ImageColor3 = Library.Theme.Text,
-        ZIndex = 9999,
-        Visible = true
-    })
+    -- Custom Cursor (desktop only)
+    local CustomCursor = nil
+    local CursorDot = nil
+    local cursorConn = nil
     
-    local CursorShadow = Create("ImageLabel", {
-        Parent = CustomCursor,
-        BackgroundTransparency = 1,
-        Position = UDim2.new(0, 2, 0, 2),
-        Size = UDim2.new(1, 0, 1, 0),
-        Image = "rbxassetid://102366537072878",
-        ImageColor3 = Color3.new(0, 0, 0),
-        ImageTransparency = 0.7,
-        ZIndex = 9998
-    })
-    
-    local CursorDot = Create("Frame", {
-        Parent = ScreenGui,
-        Name = "CursorDot",
-        BackgroundColor3 = Library.AccentColor,
-        Size = UDim2.new(0, 6, 0, 6),
-        ZIndex = 9999,
-        Visible = true,
-        BorderSizePixel = 0
-    })
-    Create("UICorner", {Parent = CursorDot, CornerRadius = UDim.new(1, 0)})
-    
-    InputService.MouseIconEnabled = false
-    
-    local cursorConn = game:GetService("RunService").RenderStepped:Connect(function()
-        local mousePos = InputService:GetMouseLocation()
-        CustomCursor.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
-        CursorDot.Position = UDim2.new(0, mousePos.X - 3, 0, mousePos.Y - 3)
-    end)
-    
-    -- Store cursor connection for cleanup
-    Library.CursorConnection = cursorConn
-    Library.CustomCursor = CustomCursor
-    Library.CursorDot = CursorDot
+    if not isMobile then
+        CustomCursor = Create("ImageLabel", {
+            Parent = ScreenGui,
+            Name = "CustomCursor",
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, 20, 0, 20),
+            Image = "rbxassetid://70896085439639",
+            ImageColor3 = Library.Theme.Text,
+            ZIndex = 9999,
+            Visible = true
+        })
+        
+        local CursorShadow = Create("ImageLabel", {
+            Parent = CustomCursor,
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 2, 0, 2),
+            Size = UDim2.new(1, 0, 1, 0),
+            Image = "rbxassetid://102366537072878",
+            ImageColor3 = Color3.new(0, 0, 0),
+            ImageTransparency = 0.7,
+            ZIndex = 9998
+        })
+        
+        CursorDot = Create("Frame", {
+            Parent = ScreenGui,
+            Name = "CursorDot",
+            BackgroundColor3 = Library.AccentColor,
+            Size = UDim2.new(0, 6, 0, 6),
+            ZIndex = 9999,
+            Visible = true,
+            BorderSizePixel = 0
+        })
+        Create("UICorner", {Parent = CursorDot, CornerRadius = UDim.new(1, 0)})
+        
+        InputService.MouseIconEnabled = false
+        
+        cursorConn = game:GetService("RunService").RenderStepped:Connect(function()
+            local mousePos = InputService:GetMouseLocation()
+            CustomCursor.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
+            CursorDot.Position = UDim2.new(0, mousePos.X - 3, 0, mousePos.Y - 3)
+        end)
+        
+        -- Store cursor connection for cleanup
+        Library.CursorConnection = cursorConn
+        Library.CustomCursor = CustomCursor
+        Library.CursorDot = CursorDot
+    end
 
-    -- Main Window (hidden until loading completes)
+    -- Main Window (hidden until loading completes, responsive)
     local Main = Create("Frame", {
         Name = "Main",
         Parent = ScreenGui,
         BackgroundColor3 = Library.Theme.Background,
         BackgroundTransparency = Acrylic and 0.3 or 0,
-        Position = UDim2.new(0.5, -375, 0.5, -275),
-        Size = UDim2.new(0, 750, 0, 550),
+        Position = UDim2.new(0.5, -windowWidth/2, 0.5, -windowHeight/2),
+        Size = UDim2.new(0, windowWidth, 0, windowHeight),
         BorderSizePixel = 0,
         ClipsDescendants = false,
         Visible = false
@@ -597,6 +630,19 @@ function Library:CreateWindow(Settings)
     -- Store reference for acrylic toggle
     Library.MainFrame = Main
     Library.Acrylic = Acrylic
+    Library.WindowWidth = windowWidth
+    Library.WindowHeight = windowHeight
+    Library.SidebarWidth = sidebarWidth
+    Library.IsMobile = isMobile
+    
+    -- Update window size on viewport change
+    Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        local newWidth, newHeight = getResponsiveSize()
+        Main.Size = UDim2.new(0, newWidth, 0, newHeight)
+        Main.Position = UDim2.new(0.5, -newWidth/2, 0.5, -newHeight/2)
+        Library.WindowWidth = newWidth
+        Library.WindowHeight = newHeight
+    end)
     
     function Library:SetAcrylic(enabled)
         Library.Acrylic = enabled
@@ -604,9 +650,9 @@ function Library:CreateWindow(Settings)
         TweenService:Create(Library.MainFrame, TweenInfo.new(0.3), {BackgroundTransparency = targetTransparency}):Play()
     end
 
-    -- Resize handles
-    local MIN_WIDTH = 600
-    local MIN_HEIGHT = 400
+    -- Resize handles (only on desktop)
+    local MIN_WIDTH = isMobile and 300 or 600
+    local MIN_HEIGHT = isMobile and 250 or 400
     local HANDLE_SIZE = 8
     
     local function CreateResizeHandle(name, position, size, cursor)
@@ -761,24 +807,24 @@ function Library:CreateWindow(Settings)
         Minimized = not Minimized
         Main.ClipsDescendants = true
         if Minimized then
-            TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 750, 0, 45)}):Play()
+            TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, windowWidth, 0, 45)}):Play()
             MinBtn.Text = "+"
         else
-            TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 750, 0, 550)}):Play()
+            TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, windowWidth, 0, windowHeight)}):Play()
             MinBtn.Text = "−"
             task.wait(0.3)
             Main.ClipsDescendants = false
         end
     end)
 
-    -- Sidebar
+    -- Sidebar (responsive width)
     local Sidebar = Create("Frame", {
         Name = "Sidebar",
         Parent = Main,
         BackgroundColor3 = Library.Theme.Sidebar,
         BackgroundTransparency = Acrylic and 0.3 or 0,
         Position = UDim2.new(0, 0, 0, 45),
-        Size = UDim2.new(0, 200, 1, -45),
+        Size = UDim2.new(0, sidebarWidth, 1, -45),
         BorderSizePixel = 0
     })
     Create("UICorner", {Parent = Sidebar, CornerRadius = UDim.new(0, 8)})
@@ -798,17 +844,19 @@ function Library:CreateWindow(Settings)
         Name = "Content",
         Parent = Main,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 215, 0, 55),
-        Size = UDim2.new(1, -225, 1, -65)
+        Position = UDim2.new(0, sidebarWidth + 15, 0, 55),
+        Size = UDim2.new(1, -(sidebarWidth + 25), 1, -65)
     })
 
     InputService.InputBegan:Connect(function(input)
         if input.KeyCode == Library.ToggleKey then 
             Library.Open = not Library.Open 
             Main.Visible = Library.Open 
-            CustomCursor.Visible = Library.Open
-            CursorDot.Visible = Library.Open
-            InputService.MouseIconEnabled = not Library.Open
+            if CustomCursor then CustomCursor.Visible = Library.Open end
+            if CursorDot then CursorDot.Visible = Library.Open end
+            if not isMobile then
+                InputService.MouseIconEnabled = not Library.Open
+            end
         end
     end)
 
@@ -1903,8 +1951,12 @@ function Library:CreateWindow(Settings)
             end
             
             function Group:AddLabel(Text)
-                local Lbl = Create("TextLabel", {Parent = Container, Text = Text, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextWrapped = true})
+                local Lbl = Create("TextLabel", {Parent = Container, Text = Text, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = isMobile and 11 or 13, TextWrapped = true})
                 return {Set = function(self, txt) Lbl.Text = txt end}
+            end
+            
+            function Group:AddDivider()
+                Create("Frame", {Parent = Container, BackgroundColor3 = Library.Theme.Outline, Size = UDim2.new(1,0,0,1), BorderSizePixel = 0})
             end
             
             return Group
@@ -1914,6 +1966,74 @@ function Library:CreateWindow(Settings)
         function Tab:AddRightGroupbox(Name) return self:CreateGroupbox(Right, Name) end
         
         return Tab
+    end
+    
+    -- SetVisible function for mobile toggle
+    function WindowObj:SetVisible(visible)
+        Main.Visible = visible
+        Library.Open = visible
+        if CustomCursor then CustomCursor.Visible = visible end
+        if CursorDot then CursorDot.Visible = visible end
+        InputService.MouseIconEnabled = not visible
+    end
+    
+    -- Mobile toggle button
+    if isMobile then
+        local MobileToggle = Create("TextButton", {
+            Parent = ScreenGui,
+            Name = "MobileToggle",
+            BackgroundColor3 = Library.AccentColor,
+            Size = UDim2.new(0, 50, 0, 50),
+            Position = UDim2.new(0, 10, 0.5, -25),
+            Text = "≡",
+            TextColor3 = Color3.new(1, 1, 1),
+            TextSize = 28,
+            Font = Enum.Font.GothamBold,
+            AutoButtonColor = false,
+            ZIndex = 10000
+        })
+        Create("UICorner", {Parent = MobileToggle, CornerRadius = UDim.new(0, 10)})
+        Create("UIStroke", {Parent = MobileToggle, Color = Color3.new(1, 1, 1), Thickness = 2})
+        
+        -- Make mobile toggle draggable
+        local dragging = false
+        local dragStart, startPos
+        
+        MobileToggle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = MobileToggle.Position
+            end
+        end)
+        
+        MobileToggle.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        
+        InputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.Touch then
+                local delta = input.Position - dragStart
+                MobileToggle.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+        
+        MobileToggle.MouseButton1Click:Connect(function()
+            Library.Open = not Library.Open
+            Main.Visible = Library.Open
+            MobileToggle.Text = Library.Open and "≡" or "+"
+            MobileToggle.BackgroundColor3 = Library.Open and Library.AccentColor or Color3.fromRGB(60, 60, 60)
+        end)
+        
+        -- Hide default cursor on mobile
+        if CustomCursor then CustomCursor.Visible = false end
+        if CursorDot then CursorDot.Visible = false end
+        InputService.MouseIconEnabled = true
     end
     
     return WindowObj
