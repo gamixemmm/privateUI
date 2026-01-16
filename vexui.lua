@@ -781,15 +781,33 @@ function Library:CreateWindow(Settings)
         Font = Library.FontBold,
         Text = Title,
         TextColor3 = Library.Theme.Text,
-        TextSize = 19,
+        TextSize = isMobile and 16 or 19,
         TextXAlignment = Enum.TextXAlignment.Left,
         ZIndex = 2
     })
     
-    local MinBtn = Create("TextButton", {
+    -- Close Button (X)
+    local CloseBtn = Create("TextButton", {
         Parent = Topbar,
         BackgroundTransparency = 1,
         Position = UDim2.new(1, -45, 0, 0),
+        Size = UDim2.new(0, 45, 1, 0),
+        Text = "×",
+        Font = Library.FontBold,
+        TextColor3 = Library.Theme.TextDim,
+        TextSize = 26,
+        AutoButtonColor = false,
+        ZIndex = 2
+    })
+    
+    CloseBtn.MouseEnter:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.Error}):Play() end)
+    CloseBtn.MouseLeave:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.TextDim}):Play() end)
+    
+    -- Minimize Button (-)
+    local MinBtn = Create("TextButton", {
+        Parent = Topbar,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(1, -90, 0, 0),
         Size = UDim2.new(0, 45, 1, 0),
         Text = "−",
         Font = Library.FontBold,
@@ -1968,69 +1986,90 @@ function Library:CreateWindow(Settings)
         return Tab
     end
     
-    -- SetVisible function for mobile toggle
+    -- SetVisible function for toggle
     function WindowObj:SetVisible(visible)
         Main.Visible = visible
         Library.Open = visible
         if CustomCursor then CustomCursor.Visible = visible end
         if CursorDot then CursorDot.Visible = visible end
-        InputService.MouseIconEnabled = not visible
+        if not isMobile then
+            InputService.MouseIconEnabled = not visible
+        end
     end
     
-    -- Mobile toggle button
+    -- Toggle button (works on ALL devices - mobile and desktop)
+    local ToggleBtn = Create("TextButton", {
+        Parent = ScreenGui,
+        Name = "ToggleButton",
+        BackgroundColor3 = Library.AccentColor,
+        Size = UDim2.new(0, 50, 0, 50),
+        Position = UDim2.new(0, 10, 0.5, -25),
+        Text = "≡",
+        TextColor3 = Color3.new(1, 1, 1),
+        TextSize = 28,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false,
+        ZIndex = 10000
+    })
+    Create("UICorner", {Parent = ToggleBtn, CornerRadius = UDim.new(0, 10)})
+    Create("UIStroke", {Parent = ToggleBtn, Color = Color3.new(1, 1, 1), Thickness = 2})
+    
+    -- Make toggle button draggable (supports both mouse and touch)
+    local toggleDragging = false
+    local toggleDragStart, toggleStartPos
+    
+    ToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            toggleDragging = true
+            toggleDragStart = input.Position
+            toggleStartPos = ToggleBtn.Position
+        end
+    end)
+    
+    ToggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            toggleDragging = false
+        end
+    end)
+    
+    InputService.InputChanged:Connect(function(input)
+        if toggleDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - toggleDragStart
+            ToggleBtn.Position = UDim2.new(
+                toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X,
+                toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    -- Toggle button click - open/close UI
+    ToggleBtn.MouseButton1Click:Connect(function()
+        Library.Open = not Library.Open
+        Main.Visible = Library.Open
+        ToggleBtn.Text = Library.Open and "≡" or "+"
+        ToggleBtn.BackgroundColor3 = Library.Open and Library.AccentColor or Color3.fromRGB(60, 60, 60)
+        if not isMobile then
+            if CustomCursor then CustomCursor.Visible = Library.Open end
+            if CursorDot then CursorDot.Visible = Library.Open end
+            InputService.MouseIconEnabled = not Library.Open
+        end
+    end)
+    
+    -- Close button click - hide UI (same as toggle)
+    CloseBtn.MouseButton1Click:Connect(function()
+        Library.Open = false
+        Main.Visible = false
+        ToggleBtn.Text = "+"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        if not isMobile then
+            if CustomCursor then CustomCursor.Visible = false end
+            if CursorDot then CursorDot.Visible = false end
+            InputService.MouseIconEnabled = true
+        end
+    end)
+    
+    -- Hide default cursor on mobile
     if isMobile then
-        local MobileToggle = Create("TextButton", {
-            Parent = ScreenGui,
-            Name = "MobileToggle",
-            BackgroundColor3 = Library.AccentColor,
-            Size = UDim2.new(0, 50, 0, 50),
-            Position = UDim2.new(0, 10, 0.5, -25),
-            Text = "≡",
-            TextColor3 = Color3.new(1, 1, 1),
-            TextSize = 28,
-            Font = Enum.Font.GothamBold,
-            AutoButtonColor = false,
-            ZIndex = 10000
-        })
-        Create("UICorner", {Parent = MobileToggle, CornerRadius = UDim.new(0, 10)})
-        Create("UIStroke", {Parent = MobileToggle, Color = Color3.new(1, 1, 1), Thickness = 2})
-        
-        -- Make mobile toggle draggable
-        local dragging = false
-        local dragStart, startPos
-        
-        MobileToggle.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                startPos = MobileToggle.Position
-            end
-        end)
-        
-        MobileToggle.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        
-        InputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.Touch then
-                local delta = input.Position - dragStart
-                MobileToggle.Position = UDim2.new(
-                    startPos.X.Scale, startPos.X.Offset + delta.X,
-                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                )
-            end
-        end)
-        
-        MobileToggle.MouseButton1Click:Connect(function()
-            Library.Open = not Library.Open
-            Main.Visible = Library.Open
-            MobileToggle.Text = Library.Open and "≡" or "+"
-            MobileToggle.BackgroundColor3 = Library.Open and Library.AccentColor or Color3.fromRGB(60, 60, 60)
-        end)
-        
-        -- Hide default cursor on mobile
         if CustomCursor then CustomCursor.Visible = false end
         if CursorDot then CursorDot.Visible = false end
         InputService.MouseIconEnabled = true
