@@ -393,6 +393,8 @@ function Library:CreateWindow(Settings)
     local Acrylic = Settings.Acrylic or false
     local BrandingText = Settings.BrandingText
     local BrandingPosition = Settings.BrandingPosition or "bottom-left" -- "bottom-left", "top-left", "top-right"
+    local DisableLoadingScreen = Settings.DisableLoadingScreen or false
+    local LoadingTimer = Settings.LoadingTimer
     
     local ScreenGui = Create("ScreenGui", { Name = "EvictedUI", IgnoreGuiInset = true, ResetOnSpawn = false })
     ProtectGui(ScreenGui)
@@ -544,9 +546,13 @@ function Library:CreateWindow(Settings)
     end
     
     -- Animate loading (5-8 seconds random)
-    local loadDuration = math.random(50, 80) / 10
-    TweenService:Create(LoadingBar, TweenInfo.new(loadDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-    task.delay(loadDuration, ShowMainAfterLoad)
+    if DisableLoadingScreen then
+        ShowMainAfterLoad()
+    else
+        local loadDuration = LoadingTimer or (math.random(50, 80) / 10)
+        TweenService:Create(LoadingBar, TweenInfo.new(loadDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+        task.delay(loadDuration, ShowMainAfterLoad)
+    end
     
     -- Notification Holder (responsive position)
     NotificationHolder = Create("Frame", {
