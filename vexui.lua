@@ -966,18 +966,22 @@ function Library:CreateWindow(Settings)
         })
         local Left = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
         local Right = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(0.5, -8, 0, 0), Position = UDim2.new(0.5, 8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+        local Full = Create("Frame", {Parent = DefaultContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
         Create("UIListLayout", {Parent = Left, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
         Create("UIListLayout", {Parent = Right, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
+        Create("UIListLayout", {Parent = Full, Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder})
         
         -- Update canvas size based on content
         local function UpdateCanvasSize()
             local leftHeight = Left.AbsoluteSize.Y
             local rightHeight = Right.AbsoluteSize.Y
-            local maxHeight = math.max(leftHeight, rightHeight)
-            DefaultContainer.CanvasSize = UDim2.new(0, 0, 0, maxHeight + 20)
+            local columnHeight = math.max(leftHeight, rightHeight)
+            Full.Position = UDim2.new(0, 0, 0, columnHeight + 12)
+            DefaultContainer.CanvasSize = UDim2.new(0, 0, 0, columnHeight + Full.AbsoluteSize.Y + 32)
         end
         Left:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
         Right:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
+        Full:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
         task.defer(UpdateCanvasSize)
         
         local function Activate()
@@ -1942,6 +1946,7 @@ function Library:CreateWindow(Settings)
                 Btn.MouseEnter:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.AccentColor}):Play() end)
                 Btn.MouseLeave:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.Theme.Element}):Play() end)
                 Btn.MouseButton1Click:Connect(function() pcall(Callback) end)
+                return Btn
             end
             
             function Group:AddInput(Text, Placeholder, Callback)
@@ -2002,8 +2007,9 @@ function Library:CreateWindow(Settings)
 
                 local RowContainer = Create("Frame", {Parent = TableFrame, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
                 
-                local cellWidth = (1 / Columns) - 0.03
-                Create("UIGridLayout", {Parent = RowContainer, CellSize = UDim2.new(cellWidth, 0, 0, 36), CellPadding = UDim2.new(0.03, 0, 0, 8), SortOrder = Enum.SortOrder.LayoutOrder})
+                local cellGap = Config.CellGap or 8
+                local cellWidthOffset = -math.floor(((Columns - 1) * cellGap) / Columns)
+                Create("UIGridLayout", {Parent = RowContainer, CellSize = UDim2.new(1 / Columns, cellWidthOffset, 0, 36), CellPadding = UDim2.new(0, cellGap, 0, 8), SortOrder = Enum.SortOrder.LayoutOrder})
                 
                 local RowObjs = {}
                 
@@ -2099,6 +2105,7 @@ function Library:CreateWindow(Settings)
             return Group
         end
         
+        function Tab:AddFullGroupbox(Name) return self:CreateGroupbox(Full, Name) end
         function Tab:AddLeftGroupbox(Name) return self:CreateGroupbox(Left, Name) end
         function Tab:AddRightGroupbox(Name) return self:CreateGroupbox(Right, Name) end
         
