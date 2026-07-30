@@ -1983,6 +1983,119 @@ function Library:CreateWindow(Settings)
                 Create("Frame", {Parent = Container, BackgroundColor3 = Library.Theme.Outline, Size = UDim2.new(1,0,0,1), BorderSizePixel = 0})
             end
             
+            function Group:AddTable(Config)
+                local Title = Config.Title
+                local Columns = Config.Columns or 2
+                local Pairs = Config.Pairs or {}
+                
+                local TableFrame = Create("Frame", {Parent = Container, BackgroundColor3 = Library.Theme.Element, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BorderSizePixel = 0})
+                Create("UICorner", {Parent = TableFrame, CornerRadius = UDim.new(0, 6)})
+                Create("UIStroke", {Parent = TableFrame, Color = Library.Theme.Outline, Thickness = 1})
+                
+                local InnerLayout = Create("UIListLayout", {Parent = TableFrame, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)})
+                Create("UIPadding", {Parent = TableFrame, PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10)})
+
+                if Title then
+                    Create("TextLabel", {Parent = TableFrame, Text = Title, Font = Library.FontBold, TextColor3 = Library.Theme.Text, Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13})
+                    Create("Frame", {Parent = TableFrame, BackgroundColor3 = Library.Theme.Outline, Size = UDim2.new(1, 0, 0, 1), BorderSizePixel = 0})
+                end
+
+                local RowContainer = Create("Frame", {Parent = TableFrame, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+                
+                local cellWidth = (1 / Columns) - 0.03
+                Create("UIGridLayout", {Parent = RowContainer, CellSize = UDim2.new(cellWidth, 0, 0, 36), CellPadding = UDim2.new(0.03, 0, 0, 8), SortOrder = Enum.SortOrder.LayoutOrder})
+                
+                local RowObjs = {}
+                
+                local function AddPair(key, value, color)
+                    local Cell = Create("Frame", {Parent = RowContainer, BackgroundTransparency = 1})
+                    Create("TextLabel", {Parent = Cell, Text = key, Font = Library.FontBold, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd})
+                    local ValLbl = Create("TextLabel", {Parent = Cell, Text = tostring(value), Font = Library.FontBold, TextColor3 = color or Library.Theme.Text, Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 0, 16), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd})
+                    RowObjs[key] = ValLbl
+                end
+                
+                for _, pair in ipairs(Pairs) do
+                    AddPair(pair[1], pair[2], pair[3])
+                end
+                
+                return {
+                    Update = function(self, key, val, color)
+                        if RowObjs[key] then
+                            RowObjs[key].Text = tostring(val)
+                            if color then RowObjs[key].TextColor3 = color end
+                        end
+                    end,
+                    SetAll = function(self, newPairs)
+                        for _, child in ipairs(RowContainer:GetChildren()) do
+                            if child:IsA("Frame") then child:Destroy() end
+                        end
+                        table.clear(RowObjs)
+                        for _, pair in ipairs(newPairs) do
+                            AddPair(pair[1], pair[2], pair[3])
+                        end
+                    end
+                }
+            end
+            
+            function Group:AddActionList(Config)
+                local Title = Config.Title
+                
+                local ListFrame = Create("Frame", {Parent = Container, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+                Create("UIListLayout", {Parent = ListFrame, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)})
+                
+                if Title then
+                    Create("TextLabel", {Parent = ListFrame, Text = Title, Font = Library.FontBold, TextColor3 = Library.Theme.Text, Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13})
+                end
+
+                local RowContainer = Create("Frame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+                Create("UIListLayout", {Parent = RowContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)})
+                
+                local ListObj = {
+                    Type = "ActionList"
+                }
+                
+                function ListObj:Clear()
+                    for _, child in ipairs(RowContainer:GetChildren()) do
+                        if child:IsA("Frame") then child:Destroy() end
+                    end
+                end
+                
+                function ListObj:AddRow(RowConfig)
+                    local Row = Create("Frame", {Parent = RowContainer, BackgroundColor3 = Library.Theme.Element, Size = UDim2.new(1, 0, 0, RowConfig.Height or 54), BorderSizePixel = 0})
+                    Create("UICorner", {Parent = Row, CornerRadius = UDim.new(0, 6)})
+                    Create("UIStroke", {Parent = Row, Color = Library.Theme.Outline, Thickness = 1})
+                    
+                    if RowConfig.Title then
+                        Create("TextLabel", {Parent = Row, Text = RowConfig.Title, Font = Library.FontBold, TextColor3 = Library.Theme.Text, Size = UDim2.new(1, -120, 0, 20), Position = UDim2.new(0, 12, 0, 4), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd})
+                    end
+                    
+                    if RowConfig.Subtitle then
+                        Create("TextLabel", {Parent = Row, Text = RowConfig.Subtitle, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1, -120, 0, 16), Position = UDim2.new(0, 12, 0, 22), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd})
+                    end
+                    
+                    if RowConfig.Desc then
+                        Create("TextLabel", {Parent = Row, Text = RowConfig.Desc, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1, -120, 0, 16), Position = UDim2.new(0, 12, 0, 36), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd})
+                    end
+                    
+                    if RowConfig.RightText then
+                        Create("TextLabel", {Parent = Row, Text = RowConfig.RightText, Font = Library.FontBold, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(0, 80, 1, 0), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, RowConfig.ButtonText and -100 or -12, 0, 0), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Right, TextSize = 13})
+                    end
+                    
+                    if RowConfig.ButtonText and RowConfig.Callback then
+                        local Btn = Create("TextButton", {Parent = Row, Text = RowConfig.ButtonText, Font = Library.FontBold, TextColor3 = Library.Theme.Text, Size = UDim2.new(0, 78, 0, 28), AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), BackgroundColor3 = Library.AccentColor, BorderSizePixel = 0, AutoButtonColor = false})
+                        Create("UICorner", {Parent = Btn, CornerRadius = UDim.new(0, 5)})
+                        
+                        Btn.MouseEnter:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play() end)
+                        Btn.MouseLeave:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play() end)
+                        Btn.MouseButton1Click:Connect(RowConfig.Callback)
+                    end
+                    
+                    return Row
+                end
+                
+                return ListObj
+            end
+            
             return Group
         end
         
