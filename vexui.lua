@@ -940,18 +940,30 @@ function Library:CreateWindow(Settings)
             Visible = false
         })
         
-        local SubTopBar = Create("Frame", {
+        local SubTopBar = Create("ScrollingFrame", {
             Parent = TabPage,
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 0, 0, 35),
-            Visible = false
+            Visible = false,
+            BorderSizePixel = 0,
+            ScrollBarThickness = 4,
+            ScrollBarImageColor3 = Library.AccentColor,
+            AutomaticCanvasSize = Enum.AutomaticSize.None,
+            ScrollingDirection = Enum.ScrollingDirection.X,
+            CanvasSize = UDim2.new(0, 0, 0, 0)
         })
-        Create("UIListLayout", {
+        local SubTopBarLayout = Create("UIListLayout", {
             Parent = SubTopBar, 
             FillDirection = Enum.FillDirection.Horizontal, 
             Padding = UDim.new(0, 20),
             HorizontalAlignment = Enum.HorizontalAlignment.Left
         })
+        local function UpdateSubTopBarCanvas()
+            local contentWidth = SubTopBarLayout.AbsoluteContentSize.X
+            SubTopBar.CanvasSize = UDim2.new(0, math.max(0, contentWidth + 8), 0, 0)
+        end
+        SubTopBarLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateSubTopBarCanvas)
+        task.defer(UpdateSubTopBarCanvas)
         
         local DefaultContainer = Create("ScrollingFrame", {
             Parent = TabPage,
@@ -1010,7 +1022,12 @@ function Library:CreateWindow(Settings)
         
         if #TabContainer:GetChildren() == 2 then Activate() end
 
-        local Tab = { HasSubTabs = false }
+        local Tab = {
+            HasSubTabs = false,
+            Activate = Activate,
+            Button = TabBtn,
+            Page = TabPage
+        }
         
         function Tab:AddSubTab(SubName)
             if not Tab.HasSubTabs then
@@ -1071,7 +1088,7 @@ function Library:CreateWindow(Settings)
             SubBtn.MouseEnter:Connect(function() if Indicator.BackgroundTransparency == 1 then TweenService:Create(SubBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.Text}):Play() end end)
             SubBtn.MouseLeave:Connect(function() if Indicator.BackgroundTransparency == 1 then TweenService:Create(SubBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.TextDim}):Play() end end)
             
-            SubBtn.MouseButton1Click:Connect(function()
+            local function ActivateSubTab()
                 for _,v in pairs(SubTopBar:GetChildren()) do 
                      if v:IsA("TextButton") then
                         TweenService:Create(v, TweenInfo.new(0.2), {TextColor3 = Library.Theme.TextDim}):Play()
@@ -1081,9 +1098,14 @@ function Library:CreateWindow(Settings)
                 TweenService:Create(SubBtn, TweenInfo.new(0.2), {TextColor3 = Library.Theme.Text}):Play()
                 TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
                 
-                for _,v in pairs(TabPage:GetChildren()) do if v:IsA("ScrollingFrame") then v.Visible = false end end
+                for _,v in pairs(TabPage:GetChildren()) do
+                    if v:IsA("ScrollingFrame") and v ~= SubTopBar then
+                        v.Visible = false
+                    end
+                end
                 SubContent.Visible = true
-            end)
+            end
+            SubBtn.MouseButton1Click:Connect(ActivateSubTab)
             
             local subcount = 0 
             for _,v in pairs(SubTopBar:GetChildren()) do if v:IsA("GuiObject") then subcount = subcount + 1 end end
@@ -1094,6 +1116,9 @@ function Library:CreateWindow(Settings)
             end
 
             return {
+                Activate = ActivateSubTab,
+                Button = SubBtn,
+                Page = SubContent,
                 AddLeftGroupbox = function(self, Name) return self:CreateGroupbox(SLeft, Name) end,
                 AddRightGroupbox = function(self, Name) return self:CreateGroupbox(SRight, Name) end,
                 CreateGroupbox = Tab.CreateGroupbox
@@ -1150,13 +1175,15 @@ function Library:CreateWindow(Settings)
                 Frame.MouseLeave:Connect(function() TweenService:Create(CheckStroke, TweenInfo.new(0.15), {Color = Library.Theme.Outline}):Play() end)
                 
                 local State = Default or false
+                local Disabled = false
                 local ToggleObj = {
                     Type = "Toggle",
                     Value = State
                 }
                 
-                local function Update(instant)
+                local function Update(instant, skipCallback)
                     ToggleObj.Value = State
+                    Frame.Active = not Disabled
                     if instant then
                         if State then
                             Check.BackgroundColor3 = Library.AccentColor
@@ -1178,12 +1205,30 @@ function Library:CreateWindow(Settings)
                             TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Library.Theme.TextDim}):Play()
                         end
                     end
-                    pcall(Callback, State)
+                    Label.TextTransparency = Disabled and 0.45 or 0
+                    Check.BackgroundTransparency = Disabled and 0.35 or 0
+                    CheckStroke.Transparency = Disabled and 0.55 or 0
+                    Checkmark.TextTransparency = Disabled and (State and 0.55 or 1) or (State and 0 or 1)
+                    if not skipCallback then
+                        pcall(Callback, State)
+                    end
                 end
                 
                 ToggleObj.Set = function(self, v) State = v self.Value = v Update(true) end
+                ToggleObj.SetDisabled = function(self, v)
+                    Disabled = v == true
+                    self.Disabled = Disabled
+                    if Disabled then
+                        Frame.AutoButtonColor = false
+                    end
+                    Update(true, true)
+                end
                 
-                Frame.MouseButton1Click:Connect(function() State = not State Update() end)
+                Frame.MouseButton1Click:Connect(function()
+                    if Disabled then return end
+                    State = not State
+                    Update()
+                end)
                 Update()
                 
                 Library.Options[Text] = ToggleObj
@@ -1207,12 +1252,13 @@ function Library:CreateWindow(Settings)
                  Bg.MouseLeave:Connect(function() TweenService:Create(BgStroke, TweenInfo.new(0.15), {Color = Library.Theme.Outline}):Play() TweenService:Create(Label, TweenInfo.new(0.15), {TextColor3 = Library.Theme.TextDim}):Play() end)
                  
                  local CurrentValue = Default or Min
+                 local Disabled = false
                  local SliderObj = {
                      Type = "Slider",
                      Value = CurrentValue
                  }
                  
-                 local function Set(v, instant)
+                 local function Set(v, instant, skipCallback)
                      v = math.clamp(v, Min, Max)
                      CurrentValue = v
                      SliderObj.Value = v
@@ -1222,15 +1268,27 @@ function Library:CreateWindow(Settings)
                          TweenService:Create(Fill, TweenInfo.new(0.1), {Size = UDim2.new((v-Min)/(Max-Min), 0, 1, 0)}):Play()
                      end
                      Value.Text = math.floor(v*100)/100
-                     pcall(Callback, v)
+                     Label.TextTransparency = Disabled and 0.45 or 0
+                     Value.TextTransparency = Disabled and 0.45 or 0
+                     Bg.BackgroundTransparency = Disabled and 0.35 or 0
+                     Fill.BackgroundTransparency = Disabled and 0.35 or 0
+                     BgStroke.Transparency = Disabled and 0.55 or 0
+                     if not skipCallback then
+                         pcall(Callback, v)
+                     end
                  end
                  
                  SliderObj.Set = function(self, v) Set(v, true) end
+                 SliderObj.SetDisabled = function(self, v)
+                     Disabled = v == true
+                     self.Disabled = Disabled
+                     Set(CurrentValue, true, true)
+                 end
                  
                  local Dragging = false
-                 Bg.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then Dragging = true Set(Min + ((Max-Min) * math.clamp((i.Position.X - Bg.AbsolutePosition.X)/Bg.AbsoluteSize.X, 0, 1))) end end)
+                 Bg.InputBegan:Connect(function(i) if not Disabled and i.UserInputType == Enum.UserInputType.MouseButton1 then Dragging = true Set(Min + ((Max-Min) * math.clamp((i.Position.X - Bg.AbsolutePosition.X)/Bg.AbsoluteSize.X, 0, 1))) end end)
                  InputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then Dragging = false end end)
-                 InputService.InputChanged:Connect(function(i) if Dragging and i.UserInputType == Enum.UserInputType.MouseMovement then Set(Min + ((Max-Min) * math.clamp((i.Position.X - Bg.AbsolutePosition.X)/Bg.AbsoluteSize.X, 0, 1))) end end)
+                 InputService.InputChanged:Connect(function(i) if not Disabled and Dragging and i.UserInputType == Enum.UserInputType.MouseMovement then Set(Min + ((Max-Min) * math.clamp((i.Position.X - Bg.AbsolutePosition.X)/Bg.AbsoluteSize.X, 0, 1))) end end)
                  Set(Default or Min)
                  
                  Library.Options[Text] = SliderObj
@@ -1257,6 +1315,7 @@ function Library:CreateWindow(Settings)
                 Create("UIListLayout", {Parent = List, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0,0)})
                 
                 local Open = false
+                local Disabled = false
                 
                 local DropdownObj = {
                     Type = "Dropdown",
@@ -1276,6 +1335,7 @@ function Library:CreateWindow(Settings)
                         TweenService:Create(OptText, TweenInfo.new(0.1), {TextColor3 = Library.Theme.TextDim}):Play()
                     end)
                     OptBtn.MouseButton1Click:Connect(function()
+                        if Disabled then return end
                         BtnText.Text = opt
                         DropdownObj.Value = opt
                         Open = false
@@ -1289,6 +1349,20 @@ function Library:CreateWindow(Settings)
                     BtnText.Text = tostring(v)
                     self.Value = v
                     pcall(Callback, v)
+                end
+                DropdownObj.SetDisabled = function(self, v)
+                    Disabled = v == true
+                    self.Disabled = Disabled
+                    if Disabled and Open then
+                        Open = false
+                        ListFrame.Size = UDim2.new(1,0,0,0)
+                        Arrow.Rotation = 0
+                    end
+                    Label.TextTransparency = Disabled and 0.45 or 0
+                    BtnText.TextTransparency = Disabled and 0.45 or 0
+                    Btn.BackgroundTransparency = Disabled and 0.35 or 0
+                    DropStroke.Transparency = Disabled and 0.55 or 0
+                    Arrow.ImageTransparency = Disabled and 0.55 or 0
                 end
                 
                 DropdownObj.Refresh = function(self, newOptions)
@@ -1313,6 +1387,7 @@ function Library:CreateWindow(Settings)
                 end)
                 
                 Btn.MouseButton1Click:Connect(function()
+                    if Disabled then return end
                     Open = not Open
                     if Open then
                         local height = math.min(#Options * 28 + 6, 150)
@@ -1946,7 +2021,20 @@ function Library:CreateWindow(Settings)
                 Btn.MouseEnter:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.AccentColor}):Play() end)
                 Btn.MouseLeave:Connect(function() TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.Theme.Element}):Play() end)
                 Btn.MouseButton1Click:Connect(function() pcall(Callback) end)
-                return Btn
+                local ButtonObj = {
+                    Instance = Btn,
+                    SetText = function(self, value)
+                        Btn.Text = tostring(value or "")
+                    end
+                }
+                return setmetatable(ButtonObj, {
+                    __index = function(_, key)
+                        return Btn[key]
+                    end,
+                    __newindex = function(_, key, value)
+                        Btn[key] = value
+                    end
+                })
             end
             
             function Group:AddInput(Text, Placeholder, Callback)
@@ -1981,7 +2069,20 @@ function Library:CreateWindow(Settings)
             
             function Group:AddLabel(Text)
                 local Lbl = Create("TextLabel", {Parent = Container, Text = Text, Font = Library.Font, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1,0,0,18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = isMobile and 11 or 13, TextWrapped = true})
-                return {Set = function(self, txt) Lbl.Text = txt end}
+                local LabelObj = {
+                    Instance = Lbl,
+                    Set = function(self, txt)
+                        Lbl.Text = tostring(txt or "")
+                    end
+                }
+                return setmetatable(LabelObj, {
+                    __index = function(_, key)
+                        return Lbl[key]
+                    end,
+                    __newindex = function(_, key, value)
+                        Lbl[key] = value
+                    end
+                })
             end
             
             function Group:AddDivider()
@@ -2014,9 +2115,11 @@ function Library:CreateWindow(Settings)
                 local RowObjs = {}
                 
                 local function AddPair(key, value, color)
-                    local Cell = Create("Frame", {Parent = RowContainer, BackgroundTransparency = 1})
-                    Create("TextLabel", {Parent = Cell, Text = key, Font = Library.FontBold, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd})
-                    local ValLbl = Create("TextLabel", {Parent = Cell, Text = tostring(value), Font = Library.FontBold, TextColor3 = color or Library.Theme.Text, Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 0, 16), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd})
+                    local Cell = Create("Frame", {Parent = RowContainer, BackgroundColor3 = Library.Theme.Section, BorderSizePixel = 0})
+                    Create("UICorner", {Parent = Cell, CornerRadius = UDim.new(0, 5)})
+                    Create("UIStroke", {Parent = Cell, Color = Library.Theme.Outline, Thickness = 1, Transparency = 0.25})
+                    Create("TextLabel", {Parent = Cell, Text = key, Font = Library.FontBold, TextColor3 = Library.Theme.TextDim, Size = UDim2.new(1, -16, 0, 14), Position = UDim2.new(0, 8, 0, 4), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd})
+                    local ValLbl = Create("TextLabel", {Parent = Cell, Text = tostring(value), Font = Library.FontBold, TextColor3 = color or Library.Theme.Text, Size = UDim2.new(1, -16, 0, 18), Position = UDim2.new(0, 8, 0, 18), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd})
                     RowObjs[key] = ValLbl
                 end
                 
@@ -2051,6 +2154,7 @@ function Library:CreateWindow(Settings)
                 
                 if Title then
                     Create("TextLabel", {Parent = ListFrame, Text = Title, Font = Library.FontBold, TextColor3 = Library.Theme.Text, Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13})
+                    Create("Frame", {Parent = ListFrame, BackgroundColor3 = Library.Theme.Outline, Size = UDim2.new(1, 0, 0, 1), BorderSizePixel = 0})
                 end
 
                 local RowContainer = Create("Frame", {Parent = ListFrame, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
