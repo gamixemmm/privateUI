@@ -2060,7 +2060,12 @@ function Library:CreateWindow(Settings)
                 Box.FocusLost:Connect(function(enter) 
                     TweenService:Create(InputStroke, TweenInfo.new(0.15), {Color = Library.Theme.Outline}):Play() 
                     InputObj.Value = Box.Text
-                    if enter then pcall(Callback, Box.Text) end 
+                    pcall(Callback, Box.Text)
+                end)
+                
+                Box:GetPropertyChangedSignal("Text"):Connect(function()
+                    InputObj.Value = Box.Text
+                    pcall(Callback, Box.Text)
                 end)
                 
                 Library.Options[Text] = InputObj
